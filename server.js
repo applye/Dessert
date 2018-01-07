@@ -63,6 +63,7 @@ function onRequest(req, respone) {
             retileMove(url, callback);
         }, function (err, result) {
             let cont = 0;
+            let key = ""; //保存key
             //取当前页的图片数
             async.mapLimit(prictureUrl, 2, function(pageurl, callback) {
                 let delay = parseInt((Math.random() * 10000000) % 1000, 10);
@@ -75,24 +76,21 @@ function onRequest(req, respone) {
                     }
                     let $ = cheerio.load(res.text);
                     //获取每页图片数，并把图片地址都存起来
-                    let key = pageurl.substring(pageurl.lastIndexOf("/")+1,pageurl.lastIndexOf("_"));
+                    key = pageurl.substring(pageurl.lastIndexOf("/")+1,pageurl.lastIndexOf("_"));
                     let pritureNum = $("#big-pic p a").length;
                     let desc = $(".tsmaincont-main-cont-desc h3").text().replace($(".tsmaincont-main-cont-desc h3 strong").text(), "");
         
                     if(desc) {
                         pricture[key].desc = desc;
                     }
-                    let pric = {};
+                    if(!pricture[key].iamgs) {
+                        pricture[key].iamgs = [];
+                    }
                     //获取url
                     for(let i=0;i<pritureNum;i++) {
                         let url = $("#big-pic p a").eq(i).find("img").attr("src");
-
                         //收集需要信息放入对象中
-                        pric.url = url;
-                        
-                        pricture[key].iamgs = [];
-                        pricture[key].iamgs.push(pric);
-                        
+                        pricture[key].iamgs.push(url);
                         pictures.push(url);
                     }
                 });
@@ -103,15 +101,15 @@ function onRequest(req, respone) {
                 }, delay);
 
             }, function (error, res) {
+            
                 //下载文件
                 let x = 0;
                 let cont = 0;
-                let delay = parseInt((Math.random() * 10000000) % 1000, 10);
+              
                 //控制下载图片的并发
                 async.mapLimit(pictures, 2, function(priUrl, callback) {
+                    let delay = parseInt((Math.random() * 10000000) % 1000, 10);
                     cont++;
-                    console.log(priUrl);
-                    return;
                     console.log('图片download并发数是', cont, ',正在抓起的是', priUrl, ',耗时' + delay + '毫秒');
                     https.get(priUrl, function(res) {
                         res.setEncoding('binary'); //转二进制
@@ -124,6 +122,11 @@ function onRequest(req, respone) {
                                
                             });
                         });
+                        res.on("error", function(err) {
+                            console.log(err);
+                        });
+                    }).on('error', function(err) {
+                        console.log(err);
                     });
 
                     setTimeout(function() {
@@ -132,6 +135,7 @@ function onRequest(req, respone) {
                     }, delay);
                 }, function(err, res) {
                     endTime = new Date();;
+                    console.log(pricture);
                     respone.write('1、耗时：' + (endTime - startTime) + 'ms' + '----->' + (Math.round((endTime - startTime) / 1000 / 60 * 100) / 100) + 'min <br/>');
                     console.log("保存完成");
                 });
